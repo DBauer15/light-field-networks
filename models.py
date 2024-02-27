@@ -38,11 +38,11 @@ class LightFieldModel(nn.Module):
                 input_encoding = nn.Identity()
                 input_encoding_outsize = 6
             elif input_encoding == 'positional':
-                n_dims = 4
+                n_dims = 8
                 input_encoding = custom_layers.PositionalEncoding(in_features=6, n_dims=n_dims)
                 input_encoding_outsize = input_encoding.out_size()
             if network == 'relu':
-                relunet_hidden_layers = 3
+                relunet_hidden_layers = 6
                 phi = custom_layers.FCBlock(hidden_ch=self.num_hidden_units_phi, num_hidden_layers=relunet_hidden_layers,
                                                  in_features=input_encoding_outsize, out_features=out_channels, outermost_linear=True, norm='layernorm_na')
             elif network == 'siren':
