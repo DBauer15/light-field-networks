@@ -164,3 +164,19 @@ class Siren(MetaModule):
                 x = layer.forward(x)
 
         return x
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, in_features, n_dims):
+        super().__init__()
+        self.in_features = in_features
+        self.n_dims = n_dims
+
+    def out_size(self):
+        return self.in_features * self.n_dims
+    
+    def forward(self, x):
+        y = []
+        for i in range(self.n_dims):
+            y.append(torch.cos(2**i * np.pi * x))
+        
+        return torch.cat(y, dim=-1)

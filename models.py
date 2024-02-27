@@ -14,7 +14,7 @@ import hyperlayers
 
 class LightFieldModel(nn.Module):
     def __init__(self, latent_dim, parameterization='plucker', network='relu',
-                 fit_single=False, conditioning='hyper', depth=False, alpha=False):
+                 fit_single=False, conditioning='hyper', input_encoding='identity', depth=False, alpha=False):
         super().__init__()
 
         self.latent_dim = latent_dim
@@ -33,7 +33,29 @@ class LightFieldModel(nn.Module):
             out_channels += 1
             self.background = torch.ones((1, 1, 1, 3)).cuda()
 
-        if self.fit_single or conditioning in ['hyper', 'low_rank']:
+        if self.fit_single:
+            if input_encoding == 'identity':
+                input_encoding = nn.Identity()
+                input_encoding_outsize = 6
+            elif input_encoding == 'positional':
+                n_dims = 4
+                input_encoding = custom_layers.PositionalEncoding(in_features=6, n_dims=n_dims)
+                input_encoding_outsize = input_encoding.out_size()
+            if network == 'relu':
+                relunet_hidden_layers = 3
+                phi = custom_layers.FCBlock(hidden_ch=self.num_hidden_units_phi, num_hidden_layers=relunet_hidden_layers,
+                                                 in_features=input_encoding_outsize, out_features=out_channels, outermost_linear=True, norm='layernorm_na')
+            elif network == 'siren':
+                omega_0 = 30.
+                phi = custom_layers.Siren(in_features=input_encoding_outsize, hidden_features=256, hidden_layers=8,
+                                               out_features=out_channels, outermost_linear=True, hidden_omega_0=omega_0,
+                                               first_omega_0=omega_0)
+
+            self.phi = nn.Sequential(
+                input_encoding,
+                phi
+            )
+        elif conditioning in ['hyper', 'low_rank']:
             if network == 'relu':
                 self.phi = custom_layers.FCBlock(hidden_ch=self.num_hidden_units_phi, num_hidden_layers=6,
                                                  in_features=6, out_features=out_channels, outermost_linear=True, norm='layernorm_na')

@@ -14,7 +14,8 @@ class LFLoss():
     def __call__(self, model_out, gt, model=None, val=False):
         loss_dict = {}
         loss_dict['img_loss'] = image_loss(model_out, gt)
-        loss_dict['reg'] = (model_out['z']**2).mean() * self.reg_weight
+        if 'z' in model_out:
+            loss_dict['reg'] = (model_out['z']**2).mean() * self.reg_weight
         return loss_dict, {}
 
 
