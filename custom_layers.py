@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
+import tinycudann as tcnn
 
 
 def init_weights_normal(m):
@@ -20,6 +21,22 @@ def first_layer_sine_init(m):
             # See paper sec. 3.2, final paragraph, and supplement Sec. 1.5 for discussion of factor 30
             m.weight.uniform_(-1 / num_input, 1 / num_input)
 
+def get_encoding_config(input_encoding, n_dims_to_encode=-1):
+    config = {} if n_dims_to_encode <= 0 else { "n_dims_to_encode": n_dims_to_encode }
+    if input_encoding == 'identity':
+        config["otype"] = "Identity"
+    elif input_encoding == 'positional':
+        config["otype"] = "Frequency"
+        config["n_frequencies"] = 8
+    elif input_encoding == 'grid':
+        config["otype"] = "HashGrid"
+        config["n_levels"] = 16
+        config["n_features_per_level"] = 2
+        config["log2_hashmap_size"] = 19
+        config["base_resolution"] = 16
+        config["per_level_scale"] = 2.0
+
+    return config
 
 class BatchLinear(nn.Linear, MetaModule):
     '''A linear meta-layer that can deal with batched weight matrices and biases, as for instance output by a
@@ -181,3 +198,39 @@ class PositionalEncoding(nn.Module):
             y.append(torch.cos(2**i * np.pi * x))
         
         return torch.cat(y, dim=-1)
+
+class FullyFusedFC(nn.Module):
+    def __init__(self, in_features, out_features, num_hidden_layers, hidden_size, input_encoding='identity', repeat_nested_encoding=False):
+        super().__init__()
+        if input_encoding == 'grid' and in_features > 3:
+            encoding_config = {
+                "otype": "Composite",
+                "nested": []
+            }
+            if repeat_nested_encoding:
+                dims_remaining = in_features
+                while dims_remaining > 0:
+                    n_dims_to_encode = min(dims_remaining, 3)
+                    encoding_config["nested"].append(get_encoding_config(input_encoding=input_encoding, n_dims_to_encode=n_dims_to_encode))
+                    dims_remaining = dims_remaining - n_dims_to_encode
+            else:
+                encoding_config["nested"].append(get_encoding_config(input_encoding=input_encoding, n_dims_to_encode=2))
+                encoding_config["nested"].append(get_encoding_config('identity', in_features-3))
+        else:
+            encoding_config = get_encoding_config(input_encoding=input_encoding)
+
+        model_config = {
+            "otype": "FullyFusedMLP",
+            "activation": "ReLU",
+            "output_activation": "None",
+            "n_neurons": hidden_size,
+            "n_hidden_layers": num_hidden_layers
+        }
+        self.net = tcnn.NetworkWithInputEncoding(
+            in_features, out_features,
+            encoding_config, model_config
+        )
+
+    def forward(self, x):
+        shape = x.shape
+        return self.net(x.reshape(-1, shape[-1])).reshape(shape[0], shape[1], -1).float()

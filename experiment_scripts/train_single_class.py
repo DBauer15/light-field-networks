@@ -27,6 +27,7 @@ p.add_argument('--network', type=str, default='relu')
 p.add_argument('--conditioning', type=str, default='hyper')
 p.add_argument('--input_encoding', type=str, default='identity')
 p.add_argument('--fit_single', type=bool, default=False)
+p.add_argument('--tcnn', type=bool, default=False)
 p.add_argument('--experiment_name', type=str, required=True)
 p.add_argument('--num_trgt', type=int, default=1)
 p.add_argument('--gpus', type=int, default=1)
@@ -66,7 +67,7 @@ def multigpu_train(gpu, opt, cache):
 
     num_instances = hdf5_dataio.get_num_instances(opt.data_root)
     model = models.LFAutoDecoder(latent_dim=256, num_instances=num_instances, parameterization='plucker',
-                                 network=opt.network, conditioning=opt.conditioning, input_encoding=opt.input_encoding, fit_single=opt.fit_single).cuda()
+                                 network=opt.network, conditioning=opt.conditioning, input_encoding=opt.input_encoding, fit_single=opt.fit_single, tcnn=opt.tcnn).cuda()
 
     if opt.checkpoint_path is not None:
         state_dict = torch.load(opt.checkpoint_path)
