@@ -172,11 +172,12 @@ class PositionalEncoding(nn.Module):
         self.n_dims = n_dims
 
     def out_size(self):
-        return self.in_features * self.n_dims
+        return self.in_features * self.n_dims * 2
     
     def forward(self, x):
         y = []
         for i in range(self.n_dims):
+            y.append(torch.sin(2**i * np.pi * x))
             y.append(torch.cos(2**i * np.pi * x))
         
         return torch.cat(y, dim=-1)
